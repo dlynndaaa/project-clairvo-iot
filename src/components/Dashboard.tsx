@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 export default function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [isFanOn, setIsFanOn] = useState(false);
@@ -92,7 +93,13 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
-            <span className="text-blue-400">◆</span>
+            <Image
+              src="/clairvo-logo-white.png"
+              alt="Clairvo Logo"
+              width={40}
+              height={40}
+              className="h-8 w-auto object-contain"
+            />
             <span className="hidden sm:inline">Air Quality Monitoring - Bengkel Harum Motor</span>
             <span className="sm:hidden">Air Quality</span>
           </h1>

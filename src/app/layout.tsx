@@ -13,8 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Air Quality Monitoring - Bengkel Harum Motor | Clairvo IoT",
+  title: "Clairvo IoT - Air Quality Monitoring | Bengkel Harum Motor",
   description: "Real-time air quality monitoring system for Bengkel Harum Motor. Built by Clairvo Team",
+  icons: {
+    icon: "/clairvo-logo-white.png",
+    shortcut: "/clairvo-logo-white.png",
+    apple: "/clairvo-logo-white.png",
+  },
 };
 
 export default function RootLayout({
