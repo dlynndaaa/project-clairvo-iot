@@ -100,8 +100,8 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               height={40}
               className="h-8 w-auto object-contain"
             />
-            <span className="hidden sm:inline">Air Quality Monitoring - Bengkel Harum Motor</span>
-            <span className="sm:hidden">Air Quality</span>
+            <span className="hidden sm:inline">Dashboard Monitoring - Bengkel Harum Motor</span>
+            <span className="sm:hidden">Monitoring</span>
           </h1>
           <div className="flex items-center gap-4">
             <span className="hidden sm:inline text-gray-300 text-sm">Welcome, <strong>{user?.name}</strong></span>
@@ -122,7 +122,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
       <main className="max-w-6xl mx-auto p-6">
         {/* Air Quality Status */}
         <div className={`bg-linear-to-r ${airQuality.color} rounded-lg p-6 ${airQuality.textColor}`}>
-          <h2 className="text-sm font-semibold opacity-70 mb-2">STATUS KUALITAS UDARA BENGKEL</h2>
+          <h2 className="text-sm font-semibold opacity-70 mb-2">KONDISI UDARA BENGKEL SEKARANG</h2>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-4xl">{airQuality.icon}</span>
             <h3 className="text-5xl font-bold">{airQuality.status}</h3>
@@ -142,22 +142,22 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
 
         {/* Real-time Sensor Readings */}
         <div className="mt-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Real-time Sensor Readings</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Pembacaan Sensor</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gray-800 rounded-lg p-6 flex flex-col items-center">
               <h3 className="text-gray-400 text-sm mb-4">Suhu</h3>
               <GaugeChart value={sensorData.temperature} max={50} color="text-blue-400" unit="°C" />
-              <p className="text-xs text-gray-500 mt-2">• Normal</p>
+              <p className="text-xs text-gray-500 mt-2">• Biasa</p>
             </div>
             <div className="bg-gray-800 rounded-lg p-6 flex flex-col items-center">
-              <h3 className="text-gray-400 text-sm mb-4">CO / Gas Berbahaya</h3>
+              <h3 className="text-gray-400 text-sm mb-4">CO / Gas</h3>
               <GaugeChart value={sensorData.co2} max={500} color="text-yellow-400" unit="ppm" />
-              <p className="text-xs text-gray-500 mt-2">• Mewaspadai</p>
+              <p className="text-xs text-gray-500 mt-2">• Pantau</p>
             </div>
             <div className="bg-gray-800 rounded-lg p-6 flex flex-col items-center">
-              <h3 className="text-gray-400 text-sm mb-4">Partikel Debu</h3>
+              <h3 className="text-gray-400 text-sm mb-4">Debu</h3>
               <GaugeChart value={sensorData.particulate} max={100} color="text-green-400" unit="µg/m³" />
-              <p className="text-xs text-gray-500 mt-2">• Waspada</p>
+              <p className="text-xs text-gray-500 mt-2">• Perhatikan</p>
             </div>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {/* Fan Control */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Fan Control</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">Kontrol Kipas</h2>
             <div className="flex items-center gap-4 mb-4">
               <span className="text-gray-400 text-sm">Mode Otomatis</span>
               <button
@@ -175,6 +175,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               >
                 <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${isAutoMode ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>
+              <span className="text-xs text-gray-500">{isAutoMode ? '🔒 Otomatis' : '🔓 Manual'}</span>
             </div>
             <div className="flex gap-2 mb-4">
               <button
@@ -184,11 +185,11 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
                   isAutoMode
                     ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
                     : isFanOn
-                    ? 'bg-gray-600 text-gray-300'
+                    ? 'bg-blue-600 text-white'
                     : 'bg-gray-500 text-white hover:bg-gray-600'
                 }`}
               >
-                ON
+                Nyalakan
               </button>
               <button
                 onClick={() => !isAutoMode && setIsFanOn(false)}
@@ -197,11 +198,11 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
                   isAutoMode
                     ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
                     : !isFanOn
-                    ? 'bg-gray-600 text-gray-300'
+                    ? 'bg-blue-600 text-white'
                     : 'bg-gray-500 text-white hover:bg-gray-600'
                 }`}
               >
-                OFF
+                Matikan
               </button>
             </div>
             <div className={`py-2 px-4 rounded-lg text-center font-semibold mb-2 ${isFanOn ? 'bg-green-500/20 text-green-400' : 'bg-gray-600/20 text-gray-400'}`}>
@@ -214,7 +215,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
 
           {/* Trend Graph */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Grafik Tren (1 Jam)</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">Grafik Tren (Terakhir 1 Jam)</h2>
             <svg width="400" height="200" className="w-full border border-gray-700 rounded bg-gray-900/50">
               <line x1="30" y1="20" x2="30" y2="180" stroke="#374151" strokeWidth="1" />
               <line x1="30" y1="180" x2="380" y2="180" stroke="#374151" strokeWidth="1" />

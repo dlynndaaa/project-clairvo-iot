@@ -54,7 +54,7 @@ export default function LoginPage({
               />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Login</h2>
-            <p className="text-gray-400">Masuk ke Dashboard IoT Anda</p>
+            <p className="text-gray-400">Masuk ke sistem monitoring bengkel</p>
           </div>
 
           {/* Form */}
@@ -109,7 +109,7 @@ export default function LoginPage({
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-6"
             >
-              {loading ? 'Sedang Login...' : 'Login'}
+              {loading ? 'Sedang Login...' : 'Masuk'}
             </button>
           </form>
 

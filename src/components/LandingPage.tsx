@@ -25,13 +25,13 @@ export default function LandingPage({ onLoginClick }: { onLoginClick: () => void
           {/* Left Side - Content */}
           <div>
             <h2 className="text-5xl font-bold text-white mb-6 leading-tight">
-              Air Quality <span className="text-blue-400">Monitoring</span>
+              Monitor Kualitas <span className="text-blue-400">Udara Bengkel</span>
             </h2>
             <p className="text-gray-300 text-lg mb-4 leading-relaxed">
-              Sistem monitoring kualitas udara real-time untuk bengkel Anda. Pantau suhu, CO, dan partikel debu dengan presisi tinggi.
+              Pantau suhu, CO, dan debu di bengkel Anda secara real-time. Sistem otomatis mengendalikan ventilasi saat kondisi memburuk.
             </p>
             <p className="text-gray-400 text-base mb-8">
-              Teknologi IoT terdepan memastikan kesehatan dan keselamatan kerja di lingkungan bengkel Anda tetap optimal.
+              Jaga lingkungan kerja tetap sehat dan aman dengan teknologi sensor IoT. Dilengkapi kontrol kipas manual dan otomatis.
             </p>
 
             {/* Features */}
@@ -39,22 +39,22 @@ export default function LandingPage({ onLoginClick }: { onLoginClick: () => void
               <div className="flex items-start gap-4">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold mt-1">✓</div>
                 <div>
-                  <h3 className="text-white font-semibold">Real-time Monitoring</h3>
-                  <p className="text-gray-400 text-sm">Data sensor diperbarui setiap detik</p>
+                  <h3 className="text-white font-semibold">Update Real-time</h3>
+                  <p className="text-gray-400 text-sm">Data sensor tercatat setiap saat</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold mt-1">✓</div>
                 <div>
-                  <h3 className="text-white font-semibold">Smart Fan Control</h3>
-                  <p className="text-gray-400 text-sm">Mode otomatis dan manual untuk kipas ventilasi</p>
+                  <h3 className="text-white font-semibold">Kipas Otomatis</h3>
+                  <p className="text-gray-400 text-sm">Menyala otomatis saat udara tidak sehat</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold mt-1">✓</div>
                 <div>
-                  <h3 className="text-white font-semibold">Data Analytics</h3>
-                  <p className="text-gray-400 text-sm">Grafik tren untuk analisis pola kualitas udara</p>
+                  <h3 className="text-white font-semibold">Laporan & Grafik</h3>
+                  <p className="text-gray-400 text-sm">Lihat pola dan riwayat kualitas udara</p>
                 </div>
               </div>
             </div>
@@ -73,18 +73,18 @@ export default function LandingPage({ onLoginClick }: { onLoginClick: () => void
               <div className="space-y-6">
                 <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
                   <div className="text-4xl mb-2">💨</div>
-                  <h3 className="text-white font-semibold mb-2">Kipas Otomatis</h3>
-                  <p className="text-gray-400 text-sm">Kontrol ventilasi berbasis kondisi real-time</p>
+                  <h3 className="text-white font-semibold mb-2">Ventilasi Pintar</h3>
+                  <p className="text-gray-400 text-sm">Kipas aktif saat CO atau debu tinggi</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
                   <div className="text-4xl mb-2">📊</div>
-                  <h3 className="text-white font-semibold mb-2">Analitik Lanjutan</h3>
-                  <p className="text-gray-400 text-sm">Visualisasi data dengan grafik interaktif</p>
+                  <h3 className="text-white font-semibold mb-2">Dashboard Jelas</h3>
+                  <p className="text-gray-400 text-sm">Lihat status kesehatan udara dengan cepat</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
-                  <div className="text-4xl mb-2">🔐</div>
-                  <h3 className="text-white font-semibold mb-2">Aman & Terpercaya</h3>
-                  <p className="text-gray-400 text-sm">Data terenkripsi dengan keamanan tingkat enterprise</p>
+                  <div className="text-4xl mb-2">🔒</div>
+                  <h3 className="text-white font-semibold mb-2">Login Aman</h3>
+                  <p className="text-gray-400 text-sm">Hanya admin bengkel yang bisa mengakses</p>
                 </div>
               </div>
             </div>
