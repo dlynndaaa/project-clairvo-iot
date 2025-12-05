@@ -28,7 +28,7 @@ export default function LandingPage({ onLoginClick }: { onLoginClick: () => void
               Monitor Kualitas <span className="text-blue-400">Udara Bengkel</span>
             </h2>
             <p className="text-gray-300 text-lg mb-4 leading-relaxed">
-              Pantau suhu, CO, dan debu di bengkel Anda secara real-time. Sistem otomatis mengendalikan ventilasi saat kondisi memburuk.
+              Pantau CO dan debu di bengkel Anda secara real-time. Sistem otomatis mengendalikan ventilasi saat kondisi memburuk.
             </p>
             <p className="text-gray-400 text-base mb-8">
               Jaga lingkungan kerja tetap sehat dan aman dengan teknologi sensor IoT. Dilengkapi kontrol kipas manual dan otomatis.
