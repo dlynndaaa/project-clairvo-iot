@@ -143,12 +143,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
         {/* Real-time Sensor Readings */}
         <div className="mt-6">
           <h2 className="text-lg font-semibold text-white mb-4">Pembacaan Sensor</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gray-800 rounded-lg p-6 flex flex-col items-center">
-              <h3 className="text-gray-400 text-sm mb-4">Suhu</h3>
-              <GaugeChart value={sensorData.temperature} max={50} color="text-blue-400" unit="°C" />
-              <p className="text-xs text-gray-500 mt-2">• Biasa</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-800 rounded-lg p-6 flex flex-col items-center">
               <h3 className="text-gray-400 text-sm mb-4">CO / Gas</h3>
               <GaugeChart value={sensorData.co2} max={500} color="text-yellow-400" unit="ppm" />
