@@ -2,6 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+// Import Firebase (Pastikan kamu sudah install: npm install firebase)
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getDatabase, ref, onValue, update } from 'firebase/database';
+
+// --- KONFIGURASI FIREBASE ---
+// Masukkan config milikmu di sini
+const firebaseConfig = {
+  apiKey: "API_KEY_KAMU",
+  authDomain: "PROJECT_ID_KAMU.firebaseapp.com",
+  databaseURL: "URL_DATABASE_FIREBASE_KAMU",
+  projectId: "PROJECT_ID_KAMU",
+  storageBucket: "PROJECT_ID_KAMU.appspot.com",
+  messagingSenderId: "SENDER_ID_KAMU",
+  appId: "APP_ID_KAMU"
+};
+
+// Inisialisasi Firebase
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 // Tipe data untuk Sensor
 interface SensorData {
@@ -10,11 +29,6 @@ interface SensorData {
   temperature: number;
   fan_status: boolean;
   created_at?: string;
-}
-
-// Tipe data untuk Settings
-interface FanSettings {
-  is_auto_mode: boolean;
 }
 
 export default function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -34,7 +48,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
   const [currentTime, setCurrentTime] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Update Jam Digital
+  // 1. Update Jam Digital (Tetap sama)
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -45,71 +59,72 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     return () => clearInterval(timeInterval);
   }, []);
 
-  // 2. Fetch Data dari API (Polling)
-  const fetchData = async () => {
-    try {
-      // Ambil Data Sensor & History
-      const resSensor = await fetch('/api/sensor/readings');
-      const jsonSensor = await resSensor.json();
-      
-      if (jsonSensor.success && jsonSensor.data.length > 0) {
-        const latest = jsonSensor.data[0]; // Data paling baru
-        setSensorData({
-          temperature: parseFloat(latest.temperature || 0),
-          co2: parseFloat(latest.co2 || 0),
-          particulate: parseFloat(latest.particulate || 0),
-          fan_status: latest.fan_status,
-        });
-        
-        // Ambil data untuk grafik (reverse agar urutan waktu benar kiri ke kanan)
-        setHistoryData(jsonSensor.data.slice(0, 20).reverse());
-      }
-
-      // Ambil Status Mode Auto/Manual
-      const resSettings = await fetch('/api/fan/settings');
-      const jsonSettings = await resSettings.json();
-      if (jsonSettings) {
-        setIsAutoMode(jsonSettings.is_auto_mode);
-      }
-      setIsLoading(false);
-
-    } catch (error) {
-      console.error("Gagal mengambil data:", error);
-    }
-  };
-
-  // Jalankan Polling setiap 2 detik
+  // 2. LOGIKA FIREBASE: Real-time Data & Fan Settings
   useEffect(() => {
-    fetchData(); 
-    const interval = setInterval(fetchData, 2000);
-    return () => clearInterval(interval);
+    let historyBuffer: SensorData[] = [];
+
+    // Listener untuk Data Sensor Terbaru (/sensor_readings/latest)
+    const sensorRef = ref(db, 'sensor_readings/latest');
+    const unsubscribeSensor = onValue(sensorRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const formattedData = {
+          temperature: parseFloat(data.temperature || 0),
+          co2: parseFloat(data.co2 || 0),
+          particulate: parseFloat(data.particulate || 0),
+          fan_status: data.fan_status,
+          created_at: data.created_at || new Date().toISOString(),
+        };
+
+        setSensorData(formattedData);
+
+        // Update history buffer untuk grafik (20 records)
+        historyBuffer = [formattedData, ...historyBuffer].slice(0, 20);
+        setHistoryData([...historyBuffer].reverse());
+        setIsLoading(false);
+      }
+    });
+
+    // Listener untuk Fan Settings (/fan_settings)
+    const settingsRef = ref(db, 'fan_settings');
+    const unsubscribeSettings = onValue(settingsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setIsAutoMode(data.is_auto_mode);
+      }
+    });
+
+    // Cleanup listeners saat component di-unmount
+    return () => {
+      unsubscribeSensor();
+      unsubscribeSettings();
+    };
   }, []);
 
-  // 3. Logic Toggle Mode Otomatis (Simpan ke DB)
+  // 3. LOGIKA FIREBASE: Update Mode Otomatis
   const toggleAutoMode = async () => {
     const newMode = !isAutoMode;
-    setIsAutoMode(newMode); // Update UI Instan
+    // Update local UI state untuk respon cepat
+    setIsAutoMode(newMode); 
 
     try {
-      await fetch('/api/fan/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          is_auto_mode: newMode,
-          // Kirim nilai default threshold agar tidak error
-          fan_on_threshold_co2: 150, 
-          fan_on_threshold_particulate: 50,
-          danger_threshold_co2: 250,
-          danger_threshold_particulate: 75
-        })
+      // Update langsung ke Firebase
+      const settingsRef = ref(db, 'fan_settings');
+      await update(settingsRef, { 
+        is_auto_mode: newMode,
+        // Sertakan threshold default agar data di Firebase tetap lengkap
+        fan_on_threshold_co2: 150, 
+        fan_on_threshold_particulate: 50,
+        danger_threshold_co2: 250,
+        danger_threshold_particulate: 75
       });
     } catch (e) {
-      console.error("Gagal update setting", e);
+      console.error("Gagal update setting ke Firebase", e);
       setIsAutoMode(!newMode); // Revert jika gagal
     }
   };
 
-  // 4. Logic Status Kualitas Udara (Berdasarkan Threshold)
+  // 4. Logic Status Kualitas Udara (Tetap sama)
   const getAirQualityStatus = () => {
     const { co2, particulate } = sensorData;
     if (co2 > 250 || particulate > 75) {
@@ -123,9 +138,9 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
 
   const airQuality = getAirQualityStatus();
 
-  // Helper Component: Gauge Chart (Speedometer)
+  // Helper Component & Function Grafik (Tetap sama)
   const GaugeChart = ({ value, max, color, unit }: { value: number; max: number; color: string; unit: string }) => {
-    const percentage = Math.min((value / max) * 100, 100); // Cap at 100%
+    const percentage = Math.min((value / max) * 100, 100);
     return (
       <div className="relative w-32 h-32">
         <svg viewBox="0 0 120 120" className="w-full h-full transform -rotate-90">
@@ -141,26 +156,22 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     );
   };
 
-  // Helper Function: Generate Points untuk Grafik SVG
   const generateChartPoints = () => {
     if (historyData.length === 0) return "";
-    const width = 360; // Lebar area grafik SVG
-    const height = 150; // Tinggi area grafik SVG
-    const maxVal = 500; // Skala max Y (CO2 ppm)
-    
-    // Mapping data ke koordinat SVG
+    const width = 360;
+    const height = 150;
+    const maxVal = 500;
     const points = historyData.map((data, index) => {
-      const x = (index / (historyData.length - 1 || 1)) * width + 20; // X rata
-      const y = height - (Math.min(data.co2, maxVal) / maxVal) * height + 20; // Y inverted
+      const x = (index / (historyData.length - 1 || 1)) * width + 20;
+      const y = height - (Math.min(data.co2, maxVal) / maxVal) * height + 20;
       return `${x},${y}`;
     });
-    
     return points.join(" ");
   };
 
+  // --- JSX RENDER (Tampilan tidak diubah sedikitpun) ---
   return (
     <div className="min-h-screen bg-gray-900 font-sans">
-      {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -182,8 +193,6 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
       </header>
 
       <main className="max-w-7xl mx-auto p-6">
-        
-        {/* Status Banner */}
         <div className={`rounded-xl p-6 mb-8 shadow-xl bg-linear-to-r ${airQuality.color} ${airQuality.textColor}`}>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
@@ -195,7 +204,6 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               <p className="mt-2 text-sm font-medium opacity-90">Real-time: {currentTime}</p>
             </div>
             
-            {/* Alert Box Kipas */}
             {(isAutoMode && airQuality.status !== 'AMAN') && (
               <div className="mt-4 md:mt-0 bg-black/20 backdrop-blur-sm px-4 py-3 rounded-lg border border-white/10">
                  <p className="text-sm font-bold flex items-center gap-2">
@@ -206,20 +214,17 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
           </div>
         </div>
 
-        {/* --- BAGIAN 1: SENSOR (Baris Atas) --- */}
         <div className="mb-6">
           <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
             <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Pembacaan Sensor
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Card CO2 */}
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 flex flex-col items-center shadow-lg">
               <h4 className="text-gray-400 text-sm font-medium mb-4">CO / Gas</h4>
               <GaugeChart value={sensorData.co2} max={500} color="text-yellow-400" unit="ppm" />
               <p className="text-xs text-gray-500 mt-4 px-2 py-1 bg-gray-900 rounded">• Ambang Batas: 150 ppm</p>
             </div>
             
-            {/* Card Debu */}
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 flex flex-col items-center shadow-lg">
               <h4 className="text-gray-400 text-sm font-medium mb-4">Debu (PM)</h4>
               <GaugeChart value={sensorData.particulate} max={100} color="text-green-400" unit="µg/m³" />
@@ -228,10 +233,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
           </div>
         </div>
 
-        {/* --- BAGIAN 2: KONTROL & GRAFIK (Baris Bawah) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* KOLOM KIRI: Kontrol Kipas */}
           <div>
             <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
               <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Kontrol Kipas
@@ -263,7 +265,6 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
             </div>
           </div>
 
-          {/* KOLOM KANAN: Grafik Tren */}
           <div>
             <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
               <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Grafik Tren (Real-time)
@@ -271,26 +272,13 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg h-[calc(100%-2.5rem)]">
               <div className="h-48 w-full relative">
                 <svg viewBox="0 0 400 200" className="w-full h-full" preserveAspectRatio="none">
-                  {/* Grid Lines */}
                   <line x1="40" y1="20" x2="40" y2="180" stroke="#374151" strokeWidth="1" />
                   <line x1="40" y1="180" x2="380" y2="180" stroke="#374151" strokeWidth="1" />
-                  
-                  {/* Labels Y Axis */}
                   <text x="35" y="25" fontSize="10" fill="#9CA3AF" textAnchor="end">500</text>
                   <text x="35" y="100" fontSize="10" fill="#9CA3AF" textAnchor="end">250</text>
                   <text x="35" y="185" fontSize="10" fill="#9CA3AF" textAnchor="end">0</text>
-                  
-                  {/* The Chart Line */}
                   {historyData.length > 1 ? (
-                    <polyline
-                      points={generateChartPoints()}
-                      fill="none"
-                      stroke="#3B82F6"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="drop-shadow-lg"
-                    />
+                    <polyline points={generateChartPoints()} fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-lg" />
                   ) : (
                     <text x="200" y="100" textAnchor="middle" fill="#6B7280" fontSize="12">Menunggu Data...</text>
                   )}
@@ -302,7 +290,6 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               </div>
             </div>
           </div>
-
         </div>
 
         <footer className="mt-12 text-center text-gray-500 text-xs border-t border-gray-800 pt-6">
