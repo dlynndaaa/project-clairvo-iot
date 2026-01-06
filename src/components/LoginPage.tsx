@@ -39,7 +39,7 @@ export default function LoginPage({
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-900 to-gray-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Login Card */}
         <div className="bg-gray-800/80 backdrop-blur border border-gray-700 rounded-2xl p-8 shadow-2xl">

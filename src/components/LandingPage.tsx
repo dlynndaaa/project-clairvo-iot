@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export default function LandingPage({ onLoginClick }: { onLoginClick: () => void }) {
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-900 to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900">
       {/* Header */}
       <header className="bg-gray-800/50 backdrop-blur border-b border-gray-700">
         <div className="max-w-6xl mx-auto px-6 py-4">
@@ -69,7 +69,7 @@ export default function LandingPage({ onLoginClick }: { onLoginClick: () => void
 
           {/* Right Side - Image/Visual */}
           <div className="hidden lg:block">
-            <div className="bg-linear-to-br from-blue-500/20 to-purple-500/20 rounded-2xl p-12 border border-blue-500/30 backdrop-blur">
+            <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl p-12 border border-blue-500/30 backdrop-blur">
               <div className="space-y-6">
                 <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
                   <div className="text-4xl mb-2">💨</div>

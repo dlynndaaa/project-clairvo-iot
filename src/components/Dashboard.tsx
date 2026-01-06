@@ -68,44 +68,67 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
 
   // 2. LOGIKA FIREBASE: Real-time Data & Fan Settings
   useEffect(() => {
+    if (!db) {
+      setIsLoading(false);
+      return;
+    }
+
     let historyBuffer: SensorData[] = [];
 
-    // Listener untuk Data Sensor Terbaru (/sensor_readings/latest)
-    const sensorRef = ref(db, 'sensor_readings/latest');
-    const unsubscribeSensor = onValue(sensorRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const formattedData = {
-          temperature: parseFloat(data.temperature || 0),
-          co2: parseFloat(data.co2 || 0),
-          particulate: parseFloat(data.particulate || 0),
-          fan_status: data.fan_status,
-          created_at: data.created_at || new Date().toISOString(),
-        };
+    try {
+      // Listener untuk Data Sensor Terbaru (/sensor_readings/latest)
+      const sensorRef = ref(db, 'sensor_readings/latest');
+      const unsubscribeSensor = onValue(
+        sensorRef,
+        (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            const formattedData = {
+              temperature: parseFloat(data.temperature || 0),
+              co2: parseFloat(data.co2 || 0),
+              particulate: parseFloat(data.particulate || 0),
+              fan_status: data.fan_status,
+              created_at: data.created_at || new Date().toISOString(),
+            };
 
-        setSensorData(formattedData);
+            setSensorData(formattedData);
 
-        // Update history buffer untuk grafik (20 records)
-        historyBuffer = [formattedData, ...historyBuffer].slice(0, 20);
-        setHistoryData([...historyBuffer].reverse());
-        setIsLoading(false);
-      }
-    });
+            // Update history buffer untuk grafik (20 records)
+            historyBuffer = [formattedData, ...historyBuffer].slice(0, 20);
+            setHistoryData([...historyBuffer].reverse());
+          }
+          setIsLoading(false);
+        },
+        (error) => {
+          console.error('Error loading sensor data:', error);
+          setIsLoading(false);
+        }
+      );
 
-    // Listener untuk Fan Settings (/fan_settings)
-    const settingsRef = ref(db, 'fan_settings');
-    const unsubscribeSettings = onValue(settingsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setIsAutoMode(data.is_auto_mode);
-      }
-    });
+      // Listener untuk Fan Settings (/fan_settings)
+      const settingsRef = ref(db, 'fan_settings');
+      const unsubscribeSettings = onValue(
+        settingsRef,
+        (snapshot) => {
+          const data = snapshot.val();
+          if (data && typeof data.is_auto_mode === 'boolean') {
+            setIsAutoMode(data.is_auto_mode);
+          }
+        },
+        (error) => {
+          console.warn('Error loading settings:', error);
+        }
+      );
 
-    // Cleanup listeners saat component di-unmount
-    return () => {
-      unsubscribeSensor();
-      unsubscribeSettings();
-    };
+      // Cleanup listeners saat component di-unmount
+      return () => {
+        unsubscribeSensor();
+        unsubscribeSettings();
+      };
+    } catch (error) {
+      console.error('Firebase setup error:', error);
+      setIsLoading(false);
+    }
   }, []);
 
   // 3. LOGIKA FIREBASE: Update Mode Otomatis
@@ -179,6 +202,18 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
   // --- JSX RENDER (Tampilan tidak diubah sedikitpun) ---
   return (
     <div className="min-h-screen bg-gray-900 font-sans">
+      {isLoading && (
+        <div className="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="mb-4">
+              <div className="w-16 h-16 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+            </div>
+            <h2 className="text-white text-lg font-semibold">Memuat Data Sensor...</h2>
+            <p className="text-gray-400 text-sm mt-2">Menghubungkan ke Firebase...</p>
+          </div>
+        </div>
+      )}
+
       <header className="bg-gray-800 border-b border-gray-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
