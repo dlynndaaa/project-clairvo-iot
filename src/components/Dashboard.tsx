@@ -154,6 +154,21 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     }
   };
 
+  // 3B. LOGIKA FIREBASE: Control Kipas Manual
+  const controlFanManual = async (status: boolean) => {
+    try {
+      const latestRef = ref(db, 'sensor_readings/latest');
+      await update(latestRef, { 
+        fan_status: status
+      });
+      
+      // Update local state untuk UI respon cepat
+      setSensorData(prev => ({ ...prev, fan_status: status }));
+    } catch (e) {
+      console.error("Gagal kontrol kipas:", e);
+    }
+  };
+
   // 4. Logic Status Kualitas Udara (Tetap sama)
   const getAirQualityStatus = () => {
     const { co2, particulate } = sensorData;
@@ -275,12 +290,12 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           <div>
             <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
               <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Kontrol Kipas
             </h3>
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg h-[calc(100%-2.5rem)]">
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex flex-col">
                   <span className="text-gray-300 font-medium">Mode Otomatis</span>
@@ -292,10 +307,16 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <button disabled={isAutoMode} className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/30' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+                <button 
+                  onClick={() => controlFanManual(true)}
+                  disabled={isAutoMode} 
+                  className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/30' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
                   Nyalakan
                 </button>
-                <button disabled={isAutoMode} className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+                <button 
+                  onClick={() => controlFanManual(false)}
+                  disabled={isAutoMode} 
+                  className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
                   Matikan
                 </button>
               </div>
@@ -304,32 +325,6 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
                 STATUS KIPAS: {sensorData.fan_status ? 'AKTIF 🌀' : 'MATI ⭕'}
               </div>
               {isAutoMode && <p className="text-center text-xs text-yellow-500 mt-3 flex justify-center items-center gap-1">🔒 Tombol terkunci di Mode Otomatis</p>}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
-              <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Grafik Tren (Real-time)
-            </h3>
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg h-[calc(100%-2.5rem)]">
-              <div className="h-48 w-full relative">
-                <svg viewBox="0 0 400 200" className="w-full h-full" preserveAspectRatio="none">
-                  <line x1="40" y1="20" x2="40" y2="180" stroke="#374151" strokeWidth="1" />
-                  <line x1="40" y1="180" x2="380" y2="180" stroke="#374151" strokeWidth="1" />
-                  <text x="35" y="25" fontSize="10" fill="#9CA3AF" textAnchor="end">500</text>
-                  <text x="35" y="100" fontSize="10" fill="#9CA3AF" textAnchor="end">250</text>
-                  <text x="35" y="185" fontSize="10" fill="#9CA3AF" textAnchor="end">0</text>
-                  {historyData.length > 1 ? (
-                    <polyline points={generateChartPoints()} fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-lg" />
-                  ) : (
-                    <text x="200" y="100" textAnchor="middle" fill="#6B7280" fontSize="12">Menunggu Data...</text>
-                  )}
-                </svg>
-              </div>
-              <div className="flex items-center gap-2 mt-2 justify-center">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-xs text-gray-400">Gas Berbahaya (ppm)</span>
-              </div>
             </div>
           </div>
         </div>
