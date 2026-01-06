@@ -7,22 +7,26 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 
 // --- KONFIGURASI FIREBASE ---
-// Masukkan config milikmu di sini
+// Gunakan environment variables dari .env.local
 const firebaseConfig = {
-  apiKey: "API_KEY_KAMU",
-  authDomain: "PROJECT_ID_KAMU.firebaseapp.com",
-  databaseURL: "URL_DATABASE_FIREBASE_KAMU",
-  projectId: "PROJECT_ID_KAMU",
-  storageBucket: "PROJECT_ID_KAMU.appspot.com",
-  messagingSenderId: "SENDER_ID_KAMU",
-  appId: "APP_ID_KAMU"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Inisialisasi Firebase (hanya di client side)
 let db: any;
 if (typeof window !== 'undefined') {
-  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  db = getDatabase(app);
+  try {
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    db = getDatabase(app);
+  } catch (error) {
+    console.error('Firebase initialization error:', error);
+  }
 }
 
 // Tipe data untuk Sensor
