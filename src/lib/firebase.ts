@@ -2,15 +2,15 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCVBeazojSe8p-y5lF3m1erFVECGihGPC8",
-  authDomain: "project-iot-14988.firebaseapp.com",
-  databaseURL: "https://project-iot-14988-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "project-iot-14988",
-  storageBucket: "project-iot-14988.appspot.com",
-  messagingSenderId: "47065380086",
-  appId: "1:47065380086:web:4b275b9d23cd17a39ae8d7",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const database = getDatabase(app);
+export const db = getDatabase(app);
