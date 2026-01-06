@@ -1,10 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  skipMiddlewareUrlNormalize: true,
-  skipTrailingSlashRedirect: true,
-  experimental: {
-    skipMiddlewareUrlNormalize: true,
-  },
-};
+const nextConfig = {};
 
 module.exports = nextConfig;
