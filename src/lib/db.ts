@@ -1,35 +1,24 @@
-import { Pool } from 'pg';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 
-// Deklarasi global agar TypeScript tidak komplain
-declare global {
-  var postgresPool: Pool | undefined;
-}
+export const getFirebaseApp = () => {
+  const firebaseConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  };
 
-const config = {
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'clairvo_iot',
+  if (typeof window === 'undefined' && !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+    throw new Error('Firebase configuration is missing. Please set environment variables.');
+  }
+
+  return getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 };
 
-let pool: Pool;
-
-if (process.env.NODE_ENV === 'production') {
-  // Di production, buat pool baru biasa
-  pool = new Pool(config);
-} else {
-  // Di development, cek apakah sudah ada pool global?
-  if (!global.postgresPool) {
-    global.postgresPool = new Pool(config);
-  }
-  pool = global.postgresPool;
-}
-
-// Listener error (Penting agar server tidak crash jika koneksi putus)
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-export default pool
+export const getFirestoreDb = () => {
+  const app = getFirebaseApp();
+  return getFirestore(app);
+};

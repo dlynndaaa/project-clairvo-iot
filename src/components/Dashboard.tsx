@@ -18,9 +18,12 @@ const firebaseConfig = {
   appId: "APP_ID_KAMU"
 };
 
-// Inisialisasi Firebase
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// Inisialisasi Firebase (hanya di client side)
+let db: any;
+if (typeof window !== 'undefined') {
+  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  db = getDatabase(app);
+}
 
 // Tipe data untuk Sensor
 interface SensorData {

@@ -1,15 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from 'firebase/firestore';
+
+const getFirebaseApp = () => {
+  const firebaseConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  };
+
+  return getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+};
 
 export async function POST(request: NextRequest) {
   try {
+    const app = getFirebaseApp();
+    const db = getFirestore(app);
+
     const { co2, particulate } = await request.json();
 
-    // Ambil setting threshold
-    const settingsRes = await pool.query(
-      'SELECT * FROM fan_settings WHERE id = 1'
-    );
-    const setting = settingsRes.rows[0];
+    // Get fan settings from Firestore
+    const settingsSnap = await getDocs(query(collection(db, 'fan_settings'), limit(1)));
+    const setting = settingsSnap.docs[0]?.data();
 
     let air_quality_status = 'AMAN';
     let fan_status = false;
@@ -32,20 +47,25 @@ export async function POST(request: NextRequest) {
       fan_status = true;
     }
 
-    const result = await pool.query(
-      `
-      INSERT INTO sensor_readings 
-      (co2, particulate, air_quality_status, fan_status)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-      `,
-      [co2, particulate, air_quality_status, fan_status]
-    );
+    const docRef = await addDoc(collection(db, 'sensor_readings'), {
+      co2,
+      particulate,
+      air_quality_status,
+      fan_status,
+      created_at: new Date(),
+    });
 
     return NextResponse.json(
       {
         success: true,
-        data: result.rows[0],
+        data: {
+          id: docRef.id,
+          co2,
+          particulate,
+          air_quality_status,
+          fan_status,
+          created_at: new Date().toISOString(),
+        },
         command: {
           fan_status: fan_status ? 1 : 0,
         },
@@ -63,11 +83,25 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const result = await pool.query(
-      'SELECT * FROM sensor_readings ORDER BY created_at DESC LIMIT 100'
+    const app = getFirebaseApp();
+    const db = getFirestore(app);
+
+    const querySnapshot = await getDocs(
+      query(
+        collection(db, 'sensor_readings'),
+        orderBy('created_at', 'desc'),
+        limit(100)
+      )
     );
-    return NextResponse.json({ success: true, data: result.rows });
+
+    const data = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return NextResponse.json({ success: true, data });
   } catch (error) {
+    console.error('Error fetching data:', error);
     return NextResponse.json(
       { error: 'Gagal ambil data' },
       { status: 500 }
