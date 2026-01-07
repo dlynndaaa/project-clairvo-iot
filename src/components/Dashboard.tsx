@@ -65,8 +65,8 @@ export default function Dashboard({
   useEffect(() => {
     if (!db) return;
 
-    /* === SENSOR DATA === */
-    const sensorRef = ref(db, 'sensor_readings/latest');
+    /* === SENSOR DATA → sensor/latest === */
+    const sensorRef = ref(db, 'sensor/latest');
     const unsubSensor = onValue(sensorRef, (snap) => {
       const d = snap.val();
       if (d) {
@@ -79,7 +79,7 @@ export default function Dashboard({
       setIsLoading(false);
     });
 
-    /* === FAN SETTINGS === */
+    /* === FAN SETTINGS → fan_settings === */
     const settingsRef = ref(db, 'fan_settings');
     const unsubSettings = onValue(settingsRef, (snap) => {
       const d = snap.val();
@@ -104,7 +104,7 @@ export default function Dashboard({
 
   const controlFanManual = async (status: boolean) => {
     if (!db || isAutoMode) return;
-    await update(ref(db, 'sensor_readings/latest'), {
+    await update(ref(db, 'sensor/latest'), {
       fan_status: status,
     });
   };
@@ -124,7 +124,12 @@ export default function Dashboard({
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Image src="/clairvo-logo-white.png" alt="Logo" width={36} height={36} />
+            <Image
+              src="/clairvo-logo-white.png"
+              alt="Logo"
+              width={36}
+              height={36}
+            />
             <h1 className="font-bold text-lg">
               Dashboard Monitoring – Bengkel Harum Motor
             </h1>
