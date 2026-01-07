@@ -3,7 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getDatabase, ref, onValue, update } from 'firebase/database';
+import {
+  getDatabase,
+  ref,
+  onValue,
+  update,
+  goOnline,
+} from 'firebase/database';
 
 /* ================= FIREBASE CONFIG ================= */
 const firebaseConfig = {
@@ -23,34 +29,21 @@ interface SensorData {
   fan_status: boolean;
 }
 
-export default function Dashboard({
-  user,
-  onLogout,
-}: {
-  user: any;
-  onLogout: () => void;
-}) {
-  /* ================= INIT FIREBASE (DEBUG) ================= */
+export default function Dashboard({ user, onLogout }: any) {
+  /* ================= INIT FIREBASE (FORCED REALTIME) ================= */
   const db = useMemo(() => {
-    if (typeof window === 'undefined') {
-      console.warn('❌ Window undefined (SSR)');
-      return null;
-    }
+    if (typeof window === 'undefined') return null;
 
-    try {
-      console.log('🚀 Init Firebase...');
-      console.log('🌍 DB URL:', firebaseConfig.databaseURL);
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const database = getDatabase(app);
 
-      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-      const database = getDatabase(app);
+    // 🔥 PAKSA FIREBASE ONLINE (ANTI OFFLINE CACHE)
+    goOnline(database);
 
-      console.log('🔥 Firebase initialized OK');
+    console.log('🚀 Firebase ONLINE');
+    console.log('🌍 DB URL:', firebaseConfig.databaseURL);
 
-      return database;
-    } catch (err) {
-      console.error('❌ Firebase init error:', err);
-      return null;
-    }
+    return database;
   }, []);
 
   /* ================= STATE ================= */
@@ -60,134 +53,103 @@ export default function Dashboard({
     fan_status: false,
   });
 
-  const [isAutoMode, setIsAutoMode] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAutoMode, setIsAutoMode] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
 
-  /* ================= CLOCK ================= */
+  /* ================= CLOCK (NON-BLOCKING) ================= */
   useEffect(() => {
-    const tick = () => {
+    const t = setInterval(() => {
       const now = new Date();
       setCurrentTime(
         now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB'
       );
-    };
-    tick();
-    const t = setInterval(tick, 1000);
+    }, 1000);
     return () => clearInterval(t);
   }, []);
 
-  /* ================= REALTIME FIREBASE LISTENER (DEBUG) ================= */
+  /* ================= REALTIME LISTENER (ZERO DELAY) ================= */
   useEffect(() => {
-    if (!db) {
-      console.warn('❌ DB belum siap');
-      return;
-    }
+    if (!db) return;
 
-    console.log('📡 Attach Firebase listeners...');
+    console.log('📡 Attaching realtime listeners');
 
-    /* === SENSOR DATA === */
+    /* === SENSOR (sensor_readings/latest) === */
     const sensorRef = ref(db, 'sensor_readings/latest');
-    console.log('📍 Listen path:', 'sensor_readings/latest');
 
     const unsubSensor = onValue(
       sensorRef,
       (snap) => {
-        console.log('📡 SENSOR snapshot exists:', snap.exists());
-        console.log('📦 SENSOR raw value:', snap.val());
-
         const d = snap.val();
-        if (d) {
-          setSensorData({
-            co2: Number(d.co2 ?? 0),
-            particulate: Number(d.particulate ?? 0),
-            fan_status: d.fan_status === true || d.fan_status === 'true',
-          });
 
-          console.log('✅ SENSOR parsed:', {
-            co2: d.co2,
-            particulate: d.particulate,
-            fan_status: d.fan_status,
-          });
-        } else {
-          console.warn('⚠️ sensor_readings/latest NULL');
-        }
+        console.log(
+          '⚡ SENSOR UPDATE:',
+          d,
+          ' @ ',
+          performance.now().toFixed(2),
+          'ms'
+        );
 
-        setIsLoading(false);
+        if (!d) return;
+
+        setSensorData({
+          co2: Number(d.co2 ?? 0),
+          particulate: Number(d.particulate ?? 0),
+          fan_status: d.fan_status === true || d.fan_status === 'true',
+        });
       },
-      (err) => {
-        console.error('❌ Sensor listener error:', err);
-        setIsLoading(false);
-      }
+      (err) => console.error('Sensor realtime error:', err)
     );
 
-    /* === FAN SETTINGS === */
+    /* === SETTINGS (fan_settings) === */
     const settingsRef = ref(db, 'fan_settings');
-    console.log('📍 Listen path:', 'fan_settings');
-
     const unsubSettings = onValue(
       settingsRef,
       (snap) => {
-        console.log('⚙️ SETTINGS snapshot exists:', snap.exists());
-        console.log('⚙️ SETTINGS raw value:', snap.val());
-
         const d = snap.val();
+
+        console.log(
+          '⚙️ SETTINGS UPDATE:',
+          d,
+          ' @ ',
+          performance.now().toFixed(2),
+          'ms'
+        );
+
         if (d && typeof d.is_auto_mode !== 'undefined') {
           setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
-          console.log('✅ AUTO MODE:', d.is_auto_mode);
         }
       },
-      (err) => console.error('❌ Settings listener error:', err)
+      (err) => console.warn('Settings realtime error:', err)
     );
 
     return () => {
-      console.log('🧹 Cleanup Firebase listeners');
       unsubSensor();
       unsubSettings();
     };
   }, [db]);
 
-  /* ================= ACTIONS (DEBUG) ================= */
+  /* ================= ACTIONS ================= */
   const toggleAutoMode = async () => {
     if (!db) return;
 
-    console.log('🔁 Toggle Auto Mode →', !isAutoMode);
+    console.log('🔁 Toggle auto mode →', !isAutoMode);
 
-    try {
-      await update(ref(db, 'fan_settings'), {
-        is_auto_mode: !isAutoMode,
-      });
-      console.log('✅ Auto mode updated');
-    } catch (err) {
-      console.error('❌ Update auto mode failed:', err);
-    }
+    await update(ref(db, 'fan_settings'), {
+      is_auto_mode: !isAutoMode,
+    });
   };
 
   const controlFanManual = async (status: boolean) => {
     if (!db || isAutoMode) return;
 
-    console.log('🌀 Manual fan control →', status);
+    console.log('🌀 Manual fan →', status);
 
-    try {
-      await update(ref(db, 'sensor_readings/latest'), {
-        fan_status: status,
-      });
-      console.log('✅ Fan status updated');
-    } catch (err) {
-      console.error('❌ Fan update failed:', err);
-    }
+    await update(ref(db, 'sensor_readings/latest'), {
+      fan_status: status,
+    });
   };
 
-  /* ================= LOADING ================= */
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        Menghubungkan ke Firebase (Realtime)...
-      </div>
-    );
-  }
-
-  /* ================= RENDER ================= */
+  /* ================= RENDER (NO LOADING, NO DELAY) ================= */
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700">
@@ -213,7 +175,9 @@ export default function Dashboard({
       </header>
 
       <main className="max-w-6xl mx-auto p-6">
-        <p className="text-sm text-gray-400 mb-6">Realtime: {currentTime}</p>
+        <p className="text-sm text-gray-400 mb-6">
+          Realtime: {currentTime}
+        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
@@ -226,7 +190,8 @@ export default function Dashboard({
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
             <p className="text-gray-400 mb-2">Debu (PM)</p>
             <p className="text-4xl font-bold text-blue-400">
-              {sensorData.particulate} <span className="text-sm">µg/m³</span>
+              {sensorData.particulate}{' '}
+              <span className="text-sm">µg/m³</span>
             </p>
           </div>
         </div>
