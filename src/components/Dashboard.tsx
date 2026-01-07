@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
@@ -16,10 +16,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Inisialisasi Firebase (Perbaikan: pastikan hanya satu instance)
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
 // Tipe data untuk Sensor
 interface SensorData {
   co2: number;
@@ -30,7 +26,20 @@ interface SensorData {
 }
 
 export default function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
-  // State untuk Data Sensor Real-time
+  // 1. Inisialisasi DB yang aman agar tidak re-init terus menerus
+  const db = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        return getDatabase(app);
+      } catch (error) {
+        console.error('Firebase initialization error:', error);
+        return null;
+      }
+    }
+    return null;
+  }, []);
+
   const [sensorData, setSensorData] = useState<SensorData>({
     temperature: 0,
     co2: 0,
@@ -38,15 +47,12 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     fan_status: false,
   });
 
-  // State untuk History Grafik
   const [historyData, setHistoryData] = useState<SensorData[]>([]);
-  
-  // State untuk Mode Kipas & Waktu
   const [isAutoMode, setIsAutoMode] = useState(true);
   const [currentTime, setCurrentTime] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Update Jam Digital
+  // 2. Update Jam Digital
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -57,11 +63,11 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     return () => clearInterval(timeInterval);
   }, []);
 
-  // 2. LOGIKA FIREBASE: Real-time Data & Fan Settings
+  // 3. LOGIKA FIREBASE: Real-time Data & Fan Settings
   useEffect(() => {
     if (!db) return;
 
-    // Listener untuk Data Sensor Terbaru (/sensor_readings/latest)
+    // Listener Data Sensor
     const sensorRef = ref(db, 'sensor_readings/latest');
     const unsubscribeSensor = onValue(sensorRef, (snapshot) => {
       const data = snapshot.val();
@@ -70,58 +76,55 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
           temperature: parseFloat(data.temperature || 0),
           co2: parseFloat(data.co2 || 0),
           particulate: parseFloat(data.particulate || 0),
-          fan_status: Boolean(data.fan_status),
+          fan_status: !!data.fan_status,
           created_at: data.created_at || new Date().toISOString(),
         };
-
         setSensorData(formattedData);
-        // Perbaikan logik history: ambil data sebelumnya agar tidak reset
         setHistoryData(prev => [formattedData, ...prev].slice(0, 20));
       }
       setIsLoading(false);
     }, (error) => {
-      console.error('Error loading sensor data:', error);
+      console.error('Gagal memuat data sensor. Cek Rules Firebase Anda:', error);
       setIsLoading(false);
     });
 
-    // Listener untuk Fan Settings (/fan_settings)
+    // Listener Fan Settings
     const settingsRef = ref(db, 'fan_settings');
     const unsubscribeSettings = onValue(settingsRef, (snapshot) => {
       const data = snapshot.val();
       if (data && typeof data.is_auto_mode === 'boolean') {
         setIsAutoMode(data.is_auto_mode);
       }
-    }, (error) => {
-      console.warn('Error loading settings:', error);
     });
 
     return () => {
       unsubscribeSensor();
       unsubscribeSettings();
     };
-  }, []);
+  }, [db]);
 
-  // 3. LOGIKA FIREBASE: Update Mode Otomatis
+  // 4. Update Mode Otomatis
   const toggleAutoMode = async () => {
+    if (!db) return;
     const newMode = !isAutoMode;
     setIsAutoMode(newMode); 
-
     try {
-      const settingsRef = ref(db, 'fan_settings');
-      await update(settingsRef, { 
-        is_auto_mode: newMode
+      await update(ref(db, 'fan_settings'), { 
+        is_auto_mode: newMode,
+        fan_on_threshold_co2: 150, 
+        fan_on_threshold_particulate: 50,
       });
     } catch (e) {
-      console.error("Gagal update setting ke Firebase", e);
-      setIsAutoMode(!newMode); 
+      console.error("Gagal update setting", e);
+      setIsAutoMode(!newMode);
     }
   };
 
-  // 3B. LOGIKA FIREBASE: Control Kipas Manual
+  // 5. Control Kipas Manual
   const controlFanManual = async (status: boolean) => {
+    if (!db || isAutoMode) return;
     try {
-      const latestRef = ref(db, 'sensor_readings/latest');
-      await update(latestRef, { 
+      await update(ref(db, 'sensor_readings/latest'), { 
         fan_status: status
       });
     } catch (e) {
@@ -129,7 +132,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     }
   };
 
-  // 4. Logic Status Kualitas Udara
+  // 6. Logic Status Udara (Asli)
   const getAirQualityStatus = () => {
     const { co2, particulate } = sensorData;
     if (co2 > 250 || particulate > 75) {
@@ -143,8 +146,8 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
 
   const airQuality = getAirQualityStatus();
 
-  // Helper Component Gauge
-  const GaugeChart = ({ value, max, color, unit }: { value: number; max: number; color: string; unit: string }) => {
+  // Helper Components (Asli)
+  const GaugeChart = ({ value, max, color, unit }: any) => {
     const percentage = Math.min((value / max) * 100, 100);
     return (
       <div className="relative w-32 h-32">
@@ -161,7 +164,7 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
     );
   };
 
-  // --- JSX RENDER (Tetap sama persis dengan kode awal Anda) ---
+  // --- JSX RENDER (TAMPILAN PERSIS SEPERTI KODE LAMA ANDA) ---
   return (
     <div className="min-h-screen bg-gray-900 font-sans">
       {isLoading && (
@@ -207,12 +210,9 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               </div>
               <p className="mt-2 text-sm font-medium opacity-90">Real-time: {currentTime}</p>
             </div>
-            
             {(isAutoMode && airQuality.status !== 'AMAN') && (
               <div className="mt-4 md:mt-0 bg-black/20 backdrop-blur-sm px-4 py-3 rounded-lg border border-white/10">
-                 <p className="text-sm font-bold flex items-center gap-2">
-                   🌀 Kipas otomatis menyala sebagai pencegahan.
-                 </p>
+                 <p className="text-sm font-bold flex items-center gap-2">🌀 Kipas otomatis menyala sebagai pencegahan.</p>
               </div>
             )}
           </div>
@@ -228,7 +228,6 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
               <GaugeChart value={sensorData.co2} max={500} color="text-yellow-400" unit="ppm" />
               <p className="text-xs text-gray-500 mt-4 px-2 py-1 bg-gray-900 rounded">• Ambang Batas: 150 ppm</p>
             </div>
-            
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 flex flex-col items-center shadow-lg">
               <h4 className="text-gray-400 text-sm font-medium mb-4">Debu (PM)</h4>
               <GaugeChart value={sensorData.particulate} max={100} color="text-green-400" unit="µg/m³" />
@@ -238,41 +237,29 @@ export default function Dashboard({ user, onLogout }: { user: any; onLogout: () 
         </div>
 
         <div className="grid grid-cols-1 gap-6">
-          <div>
-            <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
-              <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Kontrol Kipas
-            </h3>
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex flex-col">
-                  <span className="text-gray-300 font-medium">Mode Otomatis</span>
-                  <span className="text-xs text-gray-500">{isAutoMode ? 'Sensor mengontrol kipas' : 'Kontrol manual aktif'}</span>
-                </div>
-                <button onClick={toggleAutoMode} className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${isAutoMode ? 'bg-blue-600' : 'bg-gray-600'}`}>
-                  <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${isAutoMode ? 'translate-x-6' : 'translate-x-0'}`} />
-                </button>
+          <h3 className="text-white font-semibold text-lg flex items-center gap-2 mb-4">
+            <span className="w-1 h-6 bg-blue-500 rounded-full"></span> Kontrol Kipas
+          </h3>
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-col">
+                <span className="text-gray-300 font-medium">Mode Otomatis</span>
+                <span className="text-xs text-gray-500">{isAutoMode ? 'Sensor mengontrol kipas' : 'Kontrol manual aktif'}</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <button 
-                  onClick={() => controlFanManual(true)}
-                  disabled={isAutoMode} 
-                  className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/30' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
-                  Nyalakan
-                </button>
-                <button 
-                  onClick={() => controlFanManual(false)}
-                  disabled={isAutoMode} 
-                  className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
-                  Matikan
-                </button>
-              </div>
-
-              <div className={`w-full py-3 rounded-lg text-center font-bold tracking-wider transition-colors ${sensorData.fan_status ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-gray-700/50 text-gray-500 border border-gray-600'}`}>
-                STATUS KIPAS: {sensorData.fan_status ? 'AKTIF 🌀' : 'MATI ⭕'}
-              </div>
-              {isAutoMode && <p className="text-center text-xs text-yellow-500 mt-3 flex justify-center items-center gap-1">🔒 Tombol terkunci di Mode Otomatis</p>}
+              <button onClick={toggleAutoMode} className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${isAutoMode ? 'bg-blue-600' : 'bg-gray-600'}`}>
+                <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${isAutoMode ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
             </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <button onClick={() => controlFanManual(true)} disabled={isAutoMode} className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>Nyalakan</button>
+              <button onClick={() => controlFanManual(false)} disabled={isAutoMode} className={`py-3 rounded-lg font-bold transition-all ${!isAutoMode ? 'bg-gray-600 hover:bg-gray-500 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>Matikan</button>
+            </div>
+
+            <div className={`w-full py-3 rounded-lg text-center font-bold tracking-wider border transition-colors ${sensorData.fan_status ? 'bg-green-500/20 text-green-400 border-green-500/50' : 'bg-gray-700/50 text-gray-500 border-gray-600'}`}>
+              STATUS KIPAS: {sensorData.fan_status ? 'AKTIF 🌀' : 'MATI ⭕'}
+            </div>
+            {isAutoMode && <p className="text-center text-xs text-yellow-500 mt-3 flex justify-center items-center gap-1">🔒 Tombol terkunci di Mode Otomatis</p>}
           </div>
         </div>
 
