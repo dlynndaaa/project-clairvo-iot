@@ -31,7 +31,7 @@ export default function Dashboard({
   user: any;
   onLogout: () => void;
 }) {
-  /* ================= INIT FIREBASE (SAFE) ================= */
+  /* ================= INIT FIREBASE ================= */
   const db = useMemo(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -67,46 +67,35 @@ export default function Dashboard({
     return () => clearInterval(t);
   }, []);
 
-  /* ================= FIREBASE LISTENER ================= */
+  /* ================= LISTENER (AGAR TOMBOL SINKRON) ================= */
   useEffect(() => {
     if (!db) return;
 
-    console.log('🔥 Firebase connected');
-
-    /* SENSOR DATA → sensor/latest */
-    const sensorRef = ref(db, 'sensor/latest');
-    const unsubSensor = onValue(
-      sensorRef,
-      (snap) => {
-        const d = snap.val();
-        if (d) {
-          setSensorData({
-            gas: Number(d.gas ?? 0),
-            dust: Number(d.dust ?? 0),
-            fan: d.fan === true || d.fan === 'true',
-            created_at: d.created_at,
-          });
-        }
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error('Sensor read error:', err);
-        setIsLoading(false);
+    // 1. DATA SENSOR & STATUS KIPAS
+    // PERBAIKAN: Path disamakan dengan Arduino (sensor_readings/latest)
+    const sensorRef = ref(db, 'sensor_readings/latest');
+    const unsubSensor = onValue(sensorRef, (snap) => {
+      const d = snap.val();
+      if (d) {
+        setSensorData({
+          // Mapping data Arduino (co2/particulate/fan_status) ke tampilan Web
+          gas: Number(d.co2 ?? 0), 
+          dust: Number(d.particulate ?? 0),
+          fan: d.fan_status === true || d.fan_status === 'true', 
+          created_at: d.created_at,
+        });
       }
-    );
+      setIsLoading(false);
+    });
 
-    /* FAN SETTINGS → fan_settings */
+    // 2. SETTING MODE AUTO/MANUAL
     const settingsRef = ref(db, 'fan_settings');
-    const unsubSettings = onValue(
-      settingsRef,
-      (snap) => {
-        const d = snap.val();
-        if (d && typeof d.is_auto_mode !== 'undefined') {
-          setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
-        }
-      },
-      (err) => console.warn('Settings read error:', err)
-    );
+    const unsubSettings = onValue(settingsRef, (snap) => {
+      const d = snap.val();
+      if (d && typeof d.is_auto_mode !== 'undefined') {
+        setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
+      }
+    });
 
     return () => {
       unsubSensor();
@@ -114,60 +103,53 @@ export default function Dashboard({
     };
   }, [db]);
 
-  /* ================= ACTIONS ================= */
+  /* ================= LOGIKA TOMBOL (PERBAIKAN UTAMA) ================= */
+  
+  // 1. Ganti Mode (Auto <-> Manual)
   const toggleAutoMode = async () => {
     if (!db) return;
     try {
+      // Arduino baca di: /fan_settings/is_auto_mode
       await update(ref(db, 'fan_settings'), {
         is_auto_mode: !isAutoMode,
       });
     } catch (e) {
-      console.error('Update auto mode failed:', e);
+      console.error('Gagal ganti mode:', e);
     }
   };
 
+  // 2. Kontrol Kipas Manual (Nyalakan / Matikan)
   const controlFanManual = async (status: boolean) => {
-    if (!db || isAutoMode) return;
+    if (!db || isAutoMode) return; // Cegah klik kalau lagi Auto
     try {
-      await update(ref(db, 'sensor/latest'), {
-        fan: status,
+      // Arduino baca di: /sensor_readings/latest/fan_status
+      // PERBAIKAN: Path dan Key disamakan agar Arduino bereaksi
+      await update(ref(db, 'sensor_readings/latest'), {
+        fan_status: status, 
       });
     } catch (e) {
-      console.error('Manual fan control failed:', e);
+      console.error('Gagal kontrol manual:', e);
     }
   };
 
-  /* ================= UI STATE ================= */
+  /* ================= UI RENDER ================= */
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        Menghubungkan ke Firebase...
+        Menghubungkan...
       </div>
     );
   }
 
-  /* ================= RENDER ================= */
   return (
     <div className="min-h-screen bg-gray-900 font-sans text-white">
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Image
-              src="/clairvo-logo-white.png"
-              alt="Logo"
-              width={36}
-              height={36}
-            />
-            <h1 className="font-bold text-lg">
-              Dashboard Monitoring – Bengkel Harum Motor
-            </h1>
+            <Image src="/clairvo-logo-white.png" alt="Logo" width={36} height={36} />
+            <h1 className="font-bold text-lg">Dashboard Monitoring – Bengkel Harum Motor</h1>
           </div>
-          <button
-            onClick={onLogout}
-            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
-          >
-            Logout
-          </button>
+          <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
         </div>
       </header>
 
@@ -181,7 +163,6 @@ export default function Dashboard({
               {sensorData.gas} <span className="text-sm">ppm</span>
             </p>
           </div>
-
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
             <p className="text-gray-400 mb-2">Debu (PM2.5)</p>
             <p className="text-4xl font-bold text-blue-400">
@@ -194,15 +175,11 @@ export default function Dashboard({
           <div className="flex justify-between items-center mb-4">
             <div>
               <p className="font-semibold">Kontrol Kipas</p>
-              <p className="text-xs text-gray-400">
-                Mode: {isAutoMode ? 'Otomatis' : 'Manual'}
-              </p>
+              <p className="text-xs text-gray-400">Mode: {isAutoMode ? 'Otomatis' : 'Manual'}</p>
             </div>
             <button
               onClick={toggleAutoMode}
-              className={`px-5 py-2 rounded-full font-bold ${
-                isAutoMode ? 'bg-blue-600' : 'bg-gray-600'
-              }`}
+              className={`px-5 py-2 rounded-full font-bold ${isAutoMode ? 'bg-blue-600' : 'bg-gray-600'}`}
             >
               {isAutoMode ? 'AUTO' : 'MANUAL'}
             </button>
@@ -225,13 +202,7 @@ export default function Dashboard({
             </button>
           </div>
 
-          <div
-            className={`mt-4 text-center font-bold py-3 rounded ${
-              sensorData.fan
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-red-500/20 text-red-400'
-            }`}
-          >
+          <div className={`mt-4 text-center font-bold py-3 rounded ${sensorData.fan ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
             STATUS KIPAS: {sensorData.fan ? 'AKTIF 🌀' : 'MATI ⭕'}
           </div>
         </div>
