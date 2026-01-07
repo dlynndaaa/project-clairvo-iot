@@ -18,10 +18,9 @@ const firebaseConfig = {
 
 /* ================= TYPE ================= */
 interface SensorData {
-  gas: number;
-  dust: number;
-  fan: boolean;
-  created_at?: string;
+  co2: number;
+  particulate: number;
+  fan_status: boolean;
 }
 
 export default function Dashboard({
@@ -31,23 +30,18 @@ export default function Dashboard({
   user: any;
   onLogout: () => void;
 }) {
-  /* ================= INIT FIREBASE (SAFE) ================= */
+  /* ================= INIT FIREBASE ================= */
   const db = useMemo(() => {
     if (typeof window === 'undefined') return null;
-    try {
-      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-      return getDatabase(app);
-    } catch (err) {
-      console.error('Firebase init error:', err);
-      return null;
-    }
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    return getDatabase(app);
   }, []);
 
   /* ================= STATE ================= */
   const [sensorData, setSensorData] = useState<SensorData>({
-    gas: 0,
-    dust: 0,
-    fan: false,
+    co2: 0,
+    particulate: 0,
+    fan_status: false,
   });
 
   const [isAutoMode, setIsAutoMode] = useState(true);
@@ -71,42 +65,28 @@ export default function Dashboard({
   useEffect(() => {
     if (!db) return;
 
-    console.log('🔥 Firebase connected');
-
-    /* SENSOR DATA → sensor/latest */
-    const sensorRef = ref(db, 'sensor/latest');
-    const unsubSensor = onValue(
-      sensorRef,
-      (snap) => {
-        const d = snap.val();
-        if (d) {
-          setSensorData({
-            gas: Number(d.gas ?? 0),
-            dust: Number(d.dust ?? 0),
-            fan: d.fan === true || d.fan === 'true',
-            created_at: d.created_at,
-          });
-        }
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error('Sensor read error:', err);
-        setIsLoading(false);
+    /* === SENSOR DATA === */
+    const sensorRef = ref(db, 'sensor_readings/latest');
+    const unsubSensor = onValue(sensorRef, (snap) => {
+      const d = snap.val();
+      if (d) {
+        setSensorData({
+          co2: Number(d.co2 ?? 0),
+          particulate: Number(d.particulate ?? 0),
+          fan_status: d.fan_status === true || d.fan_status === 'true',
+        });
       }
-    );
+      setIsLoading(false);
+    });
 
-    /* FAN SETTINGS → fan_settings */
+    /* === FAN SETTINGS === */
     const settingsRef = ref(db, 'fan_settings');
-    const unsubSettings = onValue(
-      settingsRef,
-      (snap) => {
-        const d = snap.val();
-        if (d && typeof d.is_auto_mode !== 'undefined') {
-          setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
-        }
-      },
-      (err) => console.warn('Settings read error:', err)
-    );
+    const unsubSettings = onValue(settingsRef, (snap) => {
+      const d = snap.val();
+      if (d && typeof d.is_auto_mode !== 'undefined') {
+        setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
+      }
+    });
 
     return () => {
       unsubSensor();
@@ -117,27 +97,19 @@ export default function Dashboard({
   /* ================= ACTIONS ================= */
   const toggleAutoMode = async () => {
     if (!db) return;
-    try {
-      await update(ref(db, 'fan_settings'), {
-        is_auto_mode: !isAutoMode,
-      });
-    } catch (e) {
-      console.error('Update auto mode failed:', e);
-    }
+    await update(ref(db, 'fan_settings'), {
+      is_auto_mode: !isAutoMode,
+    });
   };
 
   const controlFanManual = async (status: boolean) => {
     if (!db || isAutoMode) return;
-    try {
-      await update(ref(db, 'sensor/latest'), {
-        fan: status,
-      });
-    } catch (e) {
-      console.error('Manual fan control failed:', e);
-    }
+    await update(ref(db, 'sensor_readings/latest'), {
+      fan_status: status,
+    });
   };
 
-  /* ================= UI STATE ================= */
+  /* ================= LOADING ================= */
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
@@ -148,16 +120,11 @@ export default function Dashboard({
 
   /* ================= RENDER ================= */
   return (
-    <div className="min-h-screen bg-gray-900 font-sans text-white">
+    <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Image
-              src="/clairvo-logo-white.png"
-              alt="Logo"
-              width={36}
-              height={36}
-            />
+            <Image src="/clairvo-logo-white.png" alt="Logo" width={36} height={36} />
             <h1 className="font-bold text-lg">
               Dashboard Monitoring – Bengkel Harum Motor
             </h1>
@@ -176,16 +143,17 @@ export default function Dashboard({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
-            <p className="text-gray-400 mb-2">Gas (CO)</p>
+            <p className="text-gray-400 mb-2">CO₂</p>
             <p className="text-4xl font-bold text-yellow-400">
-              {sensorData.gas} <span className="text-sm">ppm</span>
+              {sensorData.co2} <span className="text-sm">ppm</span>
             </p>
           </div>
 
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
-            <p className="text-gray-400 mb-2">Debu (PM2.5)</p>
+            <p className="text-gray-400 mb-2">Debu (PM)</p>
             <p className="text-4xl font-bold text-blue-400">
-              {sensorData.dust} <span className="text-sm">µg/m³</span>
+              {sensorData.particulate}{' '}
+              <span className="text-sm">µg/m³</span>
             </p>
           </div>
         </div>
@@ -227,12 +195,12 @@ export default function Dashboard({
 
           <div
             className={`mt-4 text-center font-bold py-3 rounded ${
-              sensorData.fan
+              sensorData.fan_status
                 ? 'bg-green-500/20 text-green-400'
                 : 'bg-red-500/20 text-red-400'
             }`}
           >
-            STATUS KIPAS: {sensorData.fan ? 'AKTIF 🌀' : 'MATI ⭕'}
+            STATUS KIPAS: {sensorData.fan_status ? 'AKTIF 🌀' : 'MATI ⭕'}
           </div>
         </div>
       </main>
