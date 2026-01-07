@@ -30,7 +30,7 @@ export default function Dashboard({
   user: any;
   onLogout: () => void;
 }) {
-  /* ================= INIT FIREBASE ================= */
+  /* ================= INIT FIREBASE (SAFE) ================= */
   const db = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -61,32 +61,45 @@ export default function Dashboard({
     return () => clearInterval(t);
   }, []);
 
-  /* ================= FIREBASE LISTENER ================= */
+  /* ================= REALTIME FIREBASE LISTENER ================= */
   useEffect(() => {
     if (!db) return;
 
-    /* === SENSOR DATA → sensor/latest === */
-    const sensorRef = ref(db, 'sensor/latest');
-    const unsubSensor = onValue(sensorRef, (snap) => {
-      const d = snap.val();
-      if (d) {
-        setSensorData({
-          co2: Number(d.co2 ?? 0),
-          particulate: Number(d.particulate ?? 0),
-          fan_status: d.fan_status === true || d.fan_status === 'true',
-        });
-      }
-      setIsLoading(false);
-    });
+    console.log('🔥 Firebase Realtime Connected');
 
-    /* === FAN SETTINGS → fan_settings === */
-    const settingsRef = ref(db, 'fan_settings');
-    const unsubSettings = onValue(settingsRef, (snap) => {
-      const d = snap.val();
-      if (d && typeof d.is_auto_mode !== 'undefined') {
-        setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
+    /* === SENSOR DATA (REALTIME) === */
+    const sensorRef = ref(db, 'sensor_readings/latest');
+    const unsubSensor = onValue(
+      sensorRef,
+      (snap) => {
+        const d = snap.val();
+        if (d) {
+          setSensorData({
+            co2: Number(d.co2 ?? 0),
+            particulate: Number(d.particulate ?? 0),
+            fan_status: d.fan_status === true || d.fan_status === 'true',
+          });
+        }
+        setIsLoading(false);
+      },
+      (err) => {
+        console.error('Sensor listener error:', err);
+        setIsLoading(false);
       }
-    });
+    );
+
+    /* === FAN SETTINGS (REALTIME) === */
+    const settingsRef = ref(db, 'fan_settings');
+    const unsubSettings = onValue(
+      settingsRef,
+      (snap) => {
+        const d = snap.val();
+        if (d && typeof d.is_auto_mode !== 'undefined') {
+          setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
+        }
+      },
+      (err) => console.warn('Settings listener error:', err)
+    );
 
     return () => {
       unsubSensor();
@@ -104,7 +117,7 @@ export default function Dashboard({
 
   const controlFanManual = async (status: boolean) => {
     if (!db || isAutoMode) return;
-    await update(ref(db, 'sensor/latest'), {
+    await update(ref(db, 'sensor_readings/latest'), {
       fan_status: status,
     });
   };
@@ -113,7 +126,7 @@ export default function Dashboard({
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        Menghubungkan ke Firebase...
+        Menghubungkan ke Firebase (Realtime)...
       </div>
     );
   }
@@ -124,12 +137,7 @@ export default function Dashboard({
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Image
-              src="/clairvo-logo-white.png"
-              alt="Logo"
-              width={36}
-              height={36}
-            />
+            <Image src="/clairvo-logo-white.png" alt="Logo" width={36} height={36} />
             <h1 className="font-bold text-lg">
               Dashboard Monitoring – Bengkel Harum Motor
             </h1>
