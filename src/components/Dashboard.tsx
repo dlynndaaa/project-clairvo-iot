@@ -7,44 +7,43 @@ import { getDatabase, ref, onValue, update } from 'firebase/database';
 
 /* ================= FIREBASE CONFIG ================= */
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL!,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-/* ================= TYPE ================= */
-interface SensorData {
-  co2: number;
-  particulate: number;
-  fan_status: boolean;
-}
-
-export default function Dashboard({
-  user,
-  onLogout,
-}: {
-  user: any;
-  onLogout: () => void;
-}) {
-  /* ================= INIT FIREBASE (SAFE) ================= */
+/* ================= MAIN COMPONENT ================= */
+export default function Dashboard({ user, onLogout }) {
+  /* ================= INIT FIREBASE ================= */
   const db = useMemo(() => {
     if (typeof window === 'undefined') return null;
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    return getDatabase(app);
+
+    try {
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+      const database = getDatabase(app);
+
+      console.log('🔥 Firebase initialized');
+      console.log('🌍 DB URL:', firebaseConfig.databaseURL);
+
+      return database;
+    } catch (err) {
+      console.error('❌ Firebase init error:', err);
+      return null;
+    }
   }, []);
 
   /* ================= STATE ================= */
-  const [sensorData, setSensorData] = useState<SensorData>({
+  const [sensorData, setSensorData] = useState({
     co2: 0,
     particulate: 0,
     fan_status: false,
   });
 
-  const [isAutoMode, setIsAutoMode] = useState(true);
+  const [isAutoMode, setIsAutoMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState('');
 
@@ -61,44 +60,58 @@ export default function Dashboard({
     return () => clearInterval(t);
   }, []);
 
-  /* ================= REALTIME FIREBASE LISTENER ================= */
+  /* ================= FIREBASE REALTIME LISTENERS ================= */
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+      console.warn('❌ DB belum siap');
+      return;
+    }
 
-    console.log('🔥 Firebase Realtime Connected');
+    console.log('📡 Attach Firebase listeners...');
 
-    /* === SENSOR DATA (REALTIME) === */
+    /* ===== SENSOR DATA ===== */
     const sensorRef = ref(db, 'sensor_readings/latest');
     const unsubSensor = onValue(
       sensorRef,
       (snap) => {
-        const d = snap.val();
-        if (d) {
+        console.log('📡 SENSOR exists:', snap.exists());
+        console.log('📦 SENSOR raw:', snap.val());
+
+        if (snap.exists()) {
+          const d = snap.val();
           setSensorData({
             co2: Number(d.co2 ?? 0),
             particulate: Number(d.particulate ?? 0),
             fan_status: d.fan_status === true || d.fan_status === 'true',
           });
+        } else {
+          console.warn('⚠️ sensor_readings/latest kosong');
         }
+
         setIsLoading(false);
       },
       (err) => {
-        console.error('Sensor listener error:', err);
+        console.error('❌ Sensor listener error:', err);
         setIsLoading(false);
       }
     );
 
-    /* === FAN SETTINGS (REALTIME) === */
+    /* ===== FAN SETTINGS ===== */
     const settingsRef = ref(db, 'fan_settings');
     const unsubSettings = onValue(
       settingsRef,
       (snap) => {
-        const d = snap.val();
-        if (d && typeof d.is_auto_mode !== 'undefined') {
-          setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
+        console.log('⚙️ SETTINGS exists:', snap.exists());
+        console.log('⚙️ SETTINGS raw:', snap.val());
+
+        if (snap.exists()) {
+          const d = snap.val();
+          if (typeof d.is_auto_mode !== 'undefined') {
+            setIsAutoMode(d.is_auto_mode === true || d.is_auto_mode === 'true');
+          }
         }
       },
-      (err) => console.warn('Settings listener error:', err)
+      (err) => console.error('❌ Settings listener error:', err)
     );
 
     return () => {
@@ -110,13 +123,19 @@ export default function Dashboard({
   /* ================= ACTIONS ================= */
   const toggleAutoMode = async () => {
     if (!db) return;
+
+    console.log('🔁 Toggle auto mode:', !isAutoMode);
+
     await update(ref(db, 'fan_settings'), {
       is_auto_mode: !isAutoMode,
     });
   };
 
-  const controlFanManual = async (status: boolean) => {
+  const controlFanManual = async (status) => {
     if (!db || isAutoMode) return;
+
+    console.log('🌀 Manual fan control:', status);
+
     await update(ref(db, 'sensor_readings/latest'), {
       fan_status: status,
     });
@@ -126,18 +145,23 @@ export default function Dashboard({
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-        Menghubungkan ke Firebase (Realtime)...
+        Menghubungkan ke Firebase...
       </div>
     );
   }
 
-  /* ================= RENDER ================= */
+  /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Image src="/clairvo-logo-white.png" alt="Logo" width={36} height={36} />
+            <Image
+              src="/clairvo-logo-white.png"
+              alt="Logo"
+              width={36}
+              height={36}
+            />
             <h1 className="font-bold text-lg">
               Dashboard Monitoring – Bengkel Harum Motor
             </h1>
@@ -163,10 +187,9 @@ export default function Dashboard({
           </div>
 
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
-            <p className="text-gray-400 mb-2">Debu (PM)</p>
+            <p className="text-gray-400 mb-2">Particulate</p>
             <p className="text-4xl font-bold text-blue-400">
-              {sensorData.particulate}{' '}
-              <span className="text-sm">µg/m³</span>
+              {sensorData.particulate} <span className="text-sm">µg/m³</span>
             </p>
           </div>
         </div>
@@ -213,7 +236,7 @@ export default function Dashboard({
                 : 'bg-red-500/20 text-red-400'
             }`}
           >
-            STATUS KIPAS: {sensorData.fan_status ? 'AKTIF 🌀' : 'MATI ⭕'}
+            STATUS KIPAS: {sensorData.fan_status ? 'AKTIF' : 'MATI'}
           </div>
         </div>
       </main>
