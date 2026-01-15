@@ -18,8 +18,6 @@ const char* password = "walahweh";
 
 // FIREBASE
 
-// Pastikan path ini sesuai
-
 String databaseURL = "https://project-iot-14988-default-rtdb.asia-southeast1.firebasedatabase.app";
 
 String databaseSecret = "hi05UGB8C3G2ifEfyfQCcPsL7TmQsLaZAvJ5KyZ2";
@@ -50,7 +48,7 @@ bool fanOn = false;
 
 bool showGas = true;
 
-bool isAutoMode = true; // Variable baru untuk mode
+bool isAutoMode = true;
 
 
 
@@ -156,7 +154,7 @@ int getGas() {
 
 
 
-// ===== FUNGSI BACA DATA DARI FIREBASE (BARU) =====
+// ===== BACA DATA DARI FIREBASE =====
 
 bool getFirebaseBool(String path) {
 
@@ -194,7 +192,7 @@ void setup() {
 
  
 
-  // Wajib agar sensor tidak loncat-loncat
+  // Agar sensor tidak loncat-loncat
 
   analogSetAttenuation(ADC_11db);
 
@@ -260,9 +258,7 @@ void loop() {
 
  
 
-  // --- LOGIKA UTAMA (CONTROL & SEND) ---
-
-  // Dijalankan setiap 3 detik agar tidak membuat sensor lemot (karena internet butuh waktu)
+  // --- CONTROL & SEND ---
 
   if (millis() - lastSend > 5000 && WiFi.status() == WL_CONNECTED) {
 
@@ -279,10 +275,6 @@ void loop() {
     if (isAutoMode) {
 
       // === MODE OTOMATIS (Pakai Sensor) ===
-
-      // if (!fanOn && (gas >= 1500 || dust >= 2000)) fanOn = true;
-
-      // else if (fanOn && (gas < 1450 && dust < 1950)) fanOn = false;
 
       if (!fanOn && (gas >= 1500 || dust >= 1000)) fanOn = true;
 
@@ -308,15 +300,11 @@ void loop() {
 
     HTTPClient http;
 
-    // Path disamakan dengan Web Dashboard Anda
-
     http.begin(databaseURL + "/sensor_readings/latest.json?auth=" + databaseSecret);
 
     http.addHeader("Content-Type", "application/json");
 
 
-
-    // JSON Key disesuaikan: "co2" & "particulate" agar Web bisa baca
 
     String json = "{";
 
